@@ -21,7 +21,7 @@ The script will be installed in `$HOME/.local/bin`, unless you run the command a
 To uninstall, simply :
 
 ```bash
-pip uninstall lychee_fuse
+pip uninstall lycheefs
 ```
 
 ## Configuration
@@ -45,7 +45,7 @@ You define one instance per section (here, `pi` and `vps`) and then specify :
 ## Usage
 
 ```
-Usage: lychee_fuse.py [mountpoint] [options]
+Usage: lycheefs.py [mountpoint] [options]
 
 Options:
     -h, --help             show this help message and exit
@@ -61,7 +61,7 @@ Options:
 Example :
 
 ```bash
-lychee_fuse.py -i pi /mnt/lychee
+lycheefs.py -i pi /mnt/lychee
 ```
 
 In that case :

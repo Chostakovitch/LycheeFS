@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-# lychee_fuse: a FUSE-based filesystem for Lychee, a photo management system.
+# lycheefs: a FUSE-based filesystem for Lychee, a photo management system.
 
 For additonal information, visit :
 - [Lychee](https://github.com/LycheeOrg/Lychee)
-- [lychee-fuse](https://github.com/Chostakovitch/lychee-fuse)
+- [lycheefs](https://github.com/Chostakovitch/LycheeFS)
 """
 
 # Skeleton taken from this example : https://github.com/libfuse/python-fuse/blob/master/example/xmp.py
@@ -24,7 +24,7 @@ fuse.feature_assert('stateful_files', 'has_init')
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
 
-class Lychee(Fuse):
+class LycheeFS(Fuse):
     _URL_KEY = 'url'
     _USER_KEY = 'user'
     _PASSWORD_KEY = 'password'
@@ -42,7 +42,6 @@ class Lychee(Fuse):
                                  default="settings.ini")
         self.parser.add_option('-i', '--instance', metavar="INSTANCE",
                                  help="section to use in the configuration file [default: first section of configuration]")
-
         options = self.parse(values=self, errex=1)
 
         # Exit if help is printed anyway
@@ -57,8 +56,11 @@ class Lychee(Fuse):
         self._create_lychee_session()
 
     def _create_lychee_session(self):
+        # Read configuration file
         instances = configparser.ConfigParser()
         instances.read(self.config)
+
+        # Get suitable Lychee instance configuration
         if not hasattr(self, 'instance') and len(instances.sections()) > 0:
             self.instance = instances.sections()[0]
             logging.info(f'instance not specified, use first instance found : {self.instance}.')
@@ -71,13 +73,16 @@ class Lychee(Fuse):
             logging.error(f'instance {self.instance} not found in configuration.')
             sys.exit(1)
 
+        # Get Lychee instance URL
         if not instances.has_option(self.instance, self._URL_KEY):
             logging.error(f'url is mandatory for instance {self.instance}.')
             sys.exit(1)
         host = instances.get(self.instance, self._URL_KEY)
+
         # This is the API client for the given URL
         logging.info(f'initializing connection to {host}...')
         self.client = pychee.LycheeClient(host)
+
         # Optional connection to access private albums and upload files
         if instances.has_option(self.instance, self._USER_KEY) and instances.has_option(self.instance, self._PASSWORD_KEY):
             logging.info(f'user and password found, logging to {host}...')
@@ -86,7 +91,7 @@ class Lychee(Fuse):
             self.client.login(user, password)
 
 def main():
-    fuse = Lychee()
+    fuse = LycheeFS()
     fuse.main()
 
 if __name__ == '__main__':
