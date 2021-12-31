@@ -55,6 +55,9 @@ class LycheeFS(Fuse):
         # __init__ should be the method to setup filesystem.
         self._create_lychee_session()
 
+    def readdir(self, path, offset):
+        
+
     def _create_lychee_session(self):
         # Read configuration file
         instances = configparser.ConfigParser()

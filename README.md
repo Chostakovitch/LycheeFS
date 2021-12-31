@@ -7,7 +7,7 @@ LycheeFS is a FUSE-based filesystem for [Lychee](https://github.com/LycheeOrg/Ly
 ## Installation
 
 Requirements :
-- FUSE and FUSE headers (`fuse` + `libfuse-dev` on Debian-like, `fuse3` on Arch)
+- FUSE v2 and FUSE v2 headers (`fuse` + `libfuse-dev` on Debian-like, `fuse2` on Arch)
 
 [PEP 517](https://www.python.org/dev/peps/pep-0517/) is used to specify the build system (`setuptools`) so there is no need for `setup.py`.
 Simply use `pip>19` and :
