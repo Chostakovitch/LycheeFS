@@ -12,7 +12,7 @@ For additonal information, visit :
 import configparser
 import fuse
 import logging
-import sys
+import os, errno, stat, sys
 from fuse import Fuse
 from pychee import pychee
 
@@ -55,8 +55,53 @@ class LycheeFS(Fuse):
         # __init__ should be the method to setup filesystem.
         self._create_lychee_session()
 
+        # Use names instead of ids to make things readable,
+        # ignore duplicates for now, and store name <=> id
+        # because API uses id and we only get the path eg in readir
+        self.album_path_id = {}
+        self.photo_path_id = {}
+
+    def getattr(self, path):
+        st = fuse.Stat()
+        # path is a directory (album or root)
+        if path == '/' or path in self.album_path_id:
+            st.st_mode = stat.S_IFDIR | 0o755
+            st.st_nlink = 2
+        # path is a file (image)
+        elif path in self.photo_path_id:
+            st.st_mode = stat.S_IFREG | 0o444
+            st.st_nlink = 1
+            st.st_size = 2
+        # path does not exists
+        else:
+            return -errno.ENOENT
+        return st
+
+    def readlink(self, path):
+        return os.readlink("." + path)
+
     def readdir(self, path, offset):
-        
+        dirs = []
+        files = []
+        if path == '/':
+            # Root is only made of albums (no images)
+            # Also there is smart albums, eg recent or favorite.
+            # Not sure what I will do with them, eg what should a
+            # cut/paste into favorite album should do ?...
+            albums = self.client.get_albums()
+            dirs.extend([v for (k, v) in albums['smartalbums'].items()])
+            dirs.extend(albums['albums'])
+            dirs.extend(albums['shared_albums'])
+        else:
+            album = self.client.get_album(self.album_path_id[path])
+            dirs.extend(album.get('albums', []))
+            files.extend(album.get('photos', []))
+        for d in dirs:
+            self.album_path_id[os.path.join(path, d['title'])] = d['id']
+            yield fuse.Direntry(d['title'], type=stat.S_IFDIR)
+        for f in files:
+            self.photo_path_id[os.path.join(path, f['title'])] = f['id']
+            yield fuse.Direntry(f['title'], type=stat.S_IFREG)
 
     def _create_lychee_session(self):
         # Read configuration file
