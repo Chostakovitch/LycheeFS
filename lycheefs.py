@@ -13,6 +13,7 @@ import configparser
 import fuse
 import logging
 import os, errno, stat, sys
+from datetime import datetime
 from fuse import Fuse
 from pychee import pychee
 
@@ -55,31 +56,49 @@ class LycheeFS(Fuse):
         # __init__ should be the method to setup filesystem.
         self._create_lychee_session()
 
-        # Use names instead of ids to make things readable,
+        # Use path instead of ids to make things readable,
         # ignore duplicates for now, and store name <=> id
         # because API uses id and we only get the path eg in readir
         self.album_path_id = {}
+        self.path_stats = {}
         self.photo_path_id = {}
+        #TODO maybe do this less dirty - this is used as a cache
+        # when a file is first opened. Maybe use a dedicated library
+        # which handles cache and remove unused one after some time,
+        # to avoid filling memory for large Lychee instances
+        self.photo_path_bytes = {}
 
     def getattr(self, path):
+        if path in self.path_stats:
+            return self.path_stats[path]
         st = fuse.Stat()
+        st.st_uid = os.getuid()
+        st.st_gid = os.getgid()
         # path is a directory (album or root)
         if path == '/' or path in self.album_path_id:
             st.st_mode = stat.S_IFDIR | 0o755
             st.st_nlink = 2
         # path is a file (image)
         elif path in self.photo_path_id:
+            photo_id = self.photo_path_id[path]
+            photo_info = self.client.get_photo(photo_id)
+            creation_date = datetime.strptime(photo_info['created_at'], "%Y-%m-%dT%H:%M:%S%z")
+            mod_date = datetime.strptime(photo_info['updated_at'], "%Y-%m-%dT%H:%M:%S%z")
             st.st_mode = stat.S_IFREG | 0o444
             st.st_nlink = 1
-            st.st_size = 2
+            st.st_size = photo_info['filesize']
+            st.st_ctime = datetime.timestamp(creation_date)
+            st.st_mtime = datetime.timestamp(mod_date)
+            st.st_atime = datetime.timestamp(datetime.now())
+            self.path_stats[path] = st
         # path does not exists
         else:
             return -errno.ENOENT
         return st
 
-    def readlink(self, path):
-        return os.readlink("." + path)
-
+    #TODO check what to do with offset
+    #TODO fix very bad handling of path - if anyone knows a path
+    #previous to browse from root
     def readdir(self, path, offset):
         dirs = []
         files = []
@@ -102,6 +121,36 @@ class LycheeFS(Fuse):
         for f in files:
             self.photo_path_id[os.path.join(path, f['title'])] = f['id']
             yield fuse.Direntry(f['title'], type=stat.S_IFREG)
+
+    def open(self, path, flags):
+        if path in self.photo_path_bytes:
+            return
+        if path not in self.photo_path_id:
+            return -errno.ENOENT
+        accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
+        if (flags & accmode) != os.O_RDONLY:
+            return -errno.EACCES
+        photo_id = self.photo_path_id[path]
+        # Download full-quality photo
+        #TODO allow to control this by a CLI option,
+        # but probably don't try to optimize anything ourselves
+        photo_bytes = self.client.get_photos_archive([photo_id], 'FULL')
+        self.photo_path_bytes[path] = photo_bytes
+
+    def read(self, path, size, offset):
+        # not useful now but will be for cache miss
+        if path not in self.photo_path_id:
+            return -errno.ENOENT
+
+        photo = self.photo_path_bytes[path]
+        photo_len = len(photo)
+        if offset < photo_len:
+            if offset + size > photo_len:
+                size = photo_len - offset
+            buf = photo[offset:offset + size]
+        else:
+            buf = b''
+        return buf
 
     def _create_lychee_session(self):
         # Read configuration file
