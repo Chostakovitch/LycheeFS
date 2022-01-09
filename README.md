@@ -54,8 +54,12 @@ Options:
                            path to the configuration file [default:
                            settings.ini]
     -i INSTANCE, --instance=INSTANCE
-                           section to use in the configuration file [default:
-                           first section of configuration]
+                           section to use in the configuration file
+                           [default: first section of configuration]
+    -q LEVEL, --quality=LEVEL
+                           lowest quality to use when downloading an image
+                           (one of ['THUMB', 'THUMB2X', 'SMALL', 'SMALL2X',
+                           'MEDIUM', 'MEDIUM2X', 'FULL']) [default: SMALL]
 ```
 
 Example :
@@ -76,3 +80,21 @@ To umount :
 ```bash
 umount /mnt/lychee
 ```
+
+## Implementation choices
+
+TODO : why all structure is fetched at the beginning, explain how storage is done.
+To this at the end because it will probably change : right now cache is growing forever and duplicate names won't work (we should find a way to use IDs).
+
+Note : extension is guessed from MIME type and added to photo titles fetched from server. This helps file managers to show the content of folder with placeholders while downloading image. Without extensions, most of file managers will show an empty folder until all images are downloaded, because they cannot rely on name to guess the content and must wait the content itself.
+
+## TODO
+
+- handle write, rename, mkdir etc operations
+- type hints, better variable naming, clean doc
+- manage O_CREAT in `open()`
+- implement locking for writes (at least think about it...)
+- symlinks to real photos in smart albums like `recent` instead of downloading twice
+- more realistic values for creation date of smart albums
+- fix size when downloading lower quality images (probably must be done on Lychee API side). read() calls are really slow because of wrong size.
+- GIF are not working, probably an issue on my computer ?
